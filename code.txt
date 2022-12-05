@@ -1,0 +1,296 @@
+#include<reg51.h>
+sfr dataport=0xA0;			// Data port for LCD
+sfr msg=0x90;					//port-1
+sbit rs = P1^5;
+sbit rw = P1^6;
+sbit en = P1^7;
+sbit led2= P3^4;
+sbit rly=P2^0;
+long int i;
+
+void init_serial()			// Initialize serial port
+{
+	TMOD=0x20;			// Mode2
+	TH1=0xfd;			// 9600 baud
+	SCON=0x50;			// Serial mode=1 ,8-Bit data,1 Stop bit ,1 Start bit, Receiving on
+	TR1=1;				// Start timer
+
+}
+void delay(unsigned int msec)		// Function for delay
+{
+	int i,j;
+	for(i=0;i<msec;i++)
+	    for(j=0; j<1275; j++);
+}
+
+void lcd_cmd(unsigned char item)		// Function to send command on LCD
+{
+	dataport = item;
+	rs= 0;
+	rw=0;
+	en=1;
+	delay(1);
+	en=0;
+
+} 
+
+void lcd_data(unsigned char item)		// Function to display character on LCD
+{
+	dataport = item;
+	rs= 1;
+	rw=0;
+	en=1;
+	delay(1);
+	en=0;
+
+}
+	 	
+void lcd_data_string(unsigned char *str)	// Function to display string on LCD
+{
+	int i=0;
+	while(str[i]!='\0')
+	{
+ 	  lcd_data(str[i]);				  
+ 	  i++;
+ 	  delay(10);						  				
+   } 
+}
+
+void lcd()
+{
+	lcd_cmd(0x38);		  				// For using 8-bit 2 row LCD 
+	delay(5);			  						
+	lcd_cmd(0x0F);        					// For display on cursor blinking
+	delay(5);			 						
+	lcd_cmd(0x80);		  				// Set the cursor on first position of LCD 
+	delay(5);	
+}
+
+void tx_data(unsigned char str1)	// Function to transmit data through serial port
+{
+	SBUF=str1;		  		//Store data in SBUF 
+	while(TI==0);	 			//Wait till data transmits
+	TI=0;		
+}
+
+void tx_data_string(unsigned char *str)
+{
+	while(*str!='\0')
+	{
+
+		SBUF = *str;
+		while(TI==0);
+		TI = 0;
+		++str;
+	}
+}
+
+void receive_data()  
+ {	 
+	while(RI==0);
+		P1=SBUF;
+  
+		RI=0; 
+ }
+  
+void del_msg()
+{ 
+	i=1;
+	tx_data_string("AT+CMGF=1\r");
+	delay(5);
+	tx_data_string("AT+CPMS="SM"\r");
+	delay(5);
+	tx_data_string("AT+CMGD=1\r");
+	delay(5);
+	i=1;
+	while(i<=150)
+	{     		
+				
+		receive_data();
+		if(SBUF==0x4b)//hex code of "k"
+		{
+			lcd_data_string("Message Deleted");
+			break;
+		}	
+		else if(SBUF==0X4f)//E 
+			
+			break;
+		i++;	 
+	}
+}	
+	
+void send_start_msg()
+{
+	delay(50);
+	tx_data_string("AT+CMGS=\"+919673553680\"\r"); //sms is sent to be sent to this no.	
+	delay(1);
+	tx_data_string("MOTOR STARTED");
+	tx_data(0x1A);
+	delay(5);
+	i=1;
+	while(i<=150)
+	{     		
+				
+		receive_data();
+		if(SBUF==0x4b)//K
+		{	
+			lcd_cmd(0x01);
+			lcd_data_string("Message sent");
+			break;
+		}
+		else if(i==150)
+			break;
+		i++;	 
+	}           
+}
+
+void send_stop_msg()
+{
+	delay(50);	
+	tx_data_string("AT+CMGS=\"+919673553680\"\r"); //sms is sent to be sent to this no.
+	delay(1);
+	tx_data_string("MOTOR STOPPED");
+	tx_data(0x1A);
+	i=1;
+	while(i<=150)
+	{     		
+				
+		receive_data();
+		if(SBUF==0x4b)//K
+		{	
+			lcd_cmd(0x01);
+			lcd_data_string("Message sent");
+			break;
+		}
+		else if(i==150)
+			break;
+		i++;	 
+	}           
+}
+
+void main()
+{ 	
+	
+	led2 =1;
+	lcd();								// Initialize LCD
+	init_serial();							// Initialize serial port
+	count=(-1);
+	delay(300);
+	lcd_data_string("Ready");
+	delay(10);			 					
+	lcd_cmd(0x01);
+	tx_data_string("AT\r");
+	lcd_data_string("AT");	  				
+	delay(300);
+	lcd_cmd(0x01);
+	delay(5);		 				
+	
+	tx_data_string("AT+CMGF=1\r");
+	lcd_data_string("AT+CMGF=1");
+	delay(300);
+	lcd_cmd(0x01);	 				 					
+	delay(5);
+		
+	tx_data_string("AT+CSMP=17,167,0,16\r");
+	lcd_data_string("AT+CSMP=");
+	lcd_cmd(0x0c0);
+	lcd_data_string("17,167,0,16");
+	delay(300);	
+	lcd_cmd(0x01);  					
+	delay(5);
+									//sending message
+	tx_data_string("AT+CMGS=\"+919673553680\"\r"); 
+	lcd_data_string("AT+CMGS=");
+	lcd_cmd(0x0c0);
+	lcd_data_string(""+919673553680"");								
+	delay(300);
+	lcd_cmd(0x01);	 				
+	delay(5);
+
+	
+	tx_data_string("GSM is ready, SMS * to start motor");		//command to START motor
+	lcd_data_string("GSM is ready SMS");
+	lcd_cmd(0x0c0);
+	lcd_data_string("* to start motor");  				
+	delay(300);
+	lcd_cmd(0x01);
+	lcd_data_string("Messaging User..");
+  	tx_data(0x1A);	 				
+	delay(1);
+	
+	i=1;							//loop for
+	while(i<=150)
+	{     		
+				
+		receive_data();
+		if(SBUF==0x4b)
+		{
+			lcd_cmd(0x01);
+			lcd_data_string("MESSAGE SENT");
+			delay(500);
+			lcd_cmd(0x01);
+			break;
+		}
+		
+		i++;	 
+	}
+   						
+   tx_data_string("AT+CMGF=1\r");
+   lcd_data_string("AT+CMGF=1\r");
+	delay(300);
+	lcd_cmd(0x01); 					
+	delay(5);
+	
+	tx_data_string("AT+CPMS=\"SM\"\r");
+	lcd_data_string("AT+CPMS=SM");
+	delay(300);
+	lcd_cmd(0x01);	 				  					
+	delay(5);
+
+h:       
+	tx_data_string("AT+CMGR=1\r");      				// reading msg & checking for further incomming msg  					
+	delay(5);
+	i=1;
+	while(i<=250)
+	{     		
+				
+		receive_data();
+		if(SBUF==0x2a)	//* = 0x2a	
+		{
+			lcd_data_string("Motor Started");//start
+			led2 =0;
+			rly=1;
+			delay(300);
+			lcd_cmd(0x01);
+			lcd_data_string("Messaging User");
+			delay(200);
+			send_start_msg();
+			delay(300);
+			lcd_cmd(0x01);
+			del_msg();
+			goto h;
+		}	
+		else if(SBUF== 0x23)//# = 0x23
+		{	
+			lcd_data_string("Motor Stopped");//stop
+			led2=0;
+			rly=0;
+			delay(300);
+			lcd_cmd(0x01);
+			lcd_data_string("Messaging User");
+			delay(200);
+			send_stop_msg();
+			delay(300);
+			lcd_cmd(0x01);
+			del_msg();
+			goto h;
+		}	
+		else if(SBUF==0X4F)//O
+			goto h;			
+		i++;	 
+	}
+	
+	while(1);
+
+}
+   

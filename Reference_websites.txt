@@ -1,0 +1,11 @@
+http://www.circuitstoday.com/category/8051
+
+http://www.dnatechindia.com/
+
+http://electronics.stackexchange.com/questions/21215/5v-power-supply-tutorial
+
+http://led.linear1.org/1led.wiz
+
+http://www.embedidea.com/led-interfacing-with-8051/
+
+http://www.pantechsolutions.net/microcontroller-boards/led-interfacing-with-8051-ps2-lab-kit
